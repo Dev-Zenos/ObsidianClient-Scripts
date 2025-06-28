@@ -3,7 +3,6 @@
 
   const { promises: fs } = require("fs");
   const path = require("path");
-  const { format } = require("date-fns");
 
   let analyticsPath = path.join(
     app.getPath("documents"),
@@ -48,7 +47,10 @@
   const saveanalytics = async (analytics) => {
     let analyticsCache = await loadAnalytics();
     let date = new Date();
-    date = format(date, "yyyy-MM-dd");
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const days = String(date.getDate()).padStart(2, "0");
+    date = `${year}-${month}-${days}`;
 
     let day = analyticsCache.playtime.find((d) => d.date === date);
     if (!day) {
