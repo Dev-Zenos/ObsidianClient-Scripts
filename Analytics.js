@@ -2,6 +2,7 @@
   "use strict";
 
   const { promises: fs } = require("fs");
+  const { app, BrowserWindow } = require("electron");
   const path = require("path");
 
   let analyticsPath = path.join(
