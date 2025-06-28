@@ -1,17 +1,96 @@
 (function () {
   "use strict";
 
-  console.log("[Game Logger is loaded]");
+  const { promises: fs } = require("fs");
+  const path = require("path");
+  const { format } = require("date-fns");
 
+  let analyticsPath = path.join(
+    app.getPath("documents"),
+    "ObsidianClient",
+    "clientdata",
+    "analytics.json"
+  );
   let currentGameCode = null;
+  let joinTime = null;
+  let analyticsWriteTimer = null;
+
+  const loadAnalytics = async () => {
+    let analyticsCache = null;
+    try {
+      const analyticsExist = await fs
+        .access(analyticsPath)
+        .then(() => true)
+        .catch(() => false);
+      analyticsCache = analyticsExist
+        ? JSON.parse(await fs.readFile(analyticsPath, "utf8")) || {
+            score: [],
+            playtime: [],
+          }
+        : {
+            score: [],
+            playtime: [],
+          };
+      if (!analyticsExist)
+        await fs.writeFile(analyticsPath, JSON.stringify(analyticsCache));
+      return analyticsCache;
+    } catch (err) {
+      console.error("Error loading analytics:", err);
+      analyticsCache = {
+        score: [],
+        playtime: [],
+      };
+      await fs.writeFile(analyticsPath, JSON.stringify(analyticsCache));
+      return analyticsCache;
+    }
+  };
+
+  const saveanalytics = async (analytics) => {
+    let analyticsCache = await loadAnalytics();
+    let date = new Date();
+    date = format(date, "yyyy-MM-dd");
+
+    let day = analyticsCache.playtime.find((d) => d.date === date);
+    if (!day) {
+      day = {
+        date: date,
+        playtime: analytics.duration || 0,
+        games: [analytics],
+      };
+      analyticsCache.playtime.push(day);
+    } else {
+      day.playime += analytics.duration || 0;
+      day.games.push(analytics);
+    }
+    analytics.playtime = clearTimeout(analyticsWriteTimer);
+    analyticsWriteTimer = setTimeout(
+      () =>
+        fs
+          .writeFile(analyticsPath, JSON.stringify(analyticsCache))
+          .catch((err) => console.error("Error saving analytics:", err)),
+      500
+    );
+    console.log(`Analytics saved for game: ${analytics.gameCode}`);
+  };
+
+  console.log("[Game Logger is loaded]");
   function updateGameCodeFromUrl(pageUrl) {
     if (pageUrl.includes("/games/")) {
       const parts = pageUrl.split("~");
       currentGameCode = parts[parts.length - 1];
+      joinTime = Date.now();
       console.log(`Game Code from URL: ${currentGameCode}`);
     } else {
       if (currentGameCode) {
         console.log("Left game");
+        console.log(`Game Code: ${currentGameCode}`);
+        const duration = Date.now() - joinTime;
+        console.log(`Duration: ${duration} ms`);
+        saveanalytics({
+          gameCode: currentGameCode,
+          duration: duration,
+          date: new Date().toISOString(),
+        }).catch((err) => console.error("Error saving analytics:", err));
         currentGameCode = null;
       }
     }
